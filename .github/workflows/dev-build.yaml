@@ -1,4 +1,4 @@
-name: AnythingLLM Development Docker image (amd64)
+name: AnythingLLM Development Docker image (amd64/arm64)
 
 concurrency:
   group: build-${{ github.ref }}
@@ -6,7 +6,7 @@ concurrency:
 
 on:
   push:
-    branches: ['agent-skill-plugins'] # put your current branch to create a build. Core team only.
+    branches: ['arm-runner-test'] # put your current branch to create a build. Core team only.
     paths-ignore:
       - '**.md'
       - 'cloud-deployments/*'
@@ -20,7 +20,7 @@ on:
 jobs:
   push_multi_platform_to_registries:
     name: Push Docker multi-platform image to multiple registries
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     permissions:
       packages: write
       contents: read
@@ -69,7 +69,7 @@ jobs:
           push: true
           sbom: true
           provenance: mode=max
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
@@ -94,6 +94,8 @@ jobs:
 
       # About VEX attestations https://docs.docker.com/scout/explore/exceptions/
       # Justifications https://github.com/openvex/spec/blob/main/OPENVEX-SPEC.md#status-justifications
+      # Fixed to use v1.15.1 of scout-cli as v1.16.0 install script is broken
+      # https://github.com/docker/scout-cli
       - name: Add VEX attestations
         env:
           CVE_EXCEPTIONS: ${{ steps.cve-list.outputs.CVE_EXCEPTIONS }}
@@ -110,5 +112,3 @@ jobs:
             done
           done
         shell: bash
-
-      

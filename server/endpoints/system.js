@@ -27,6 +27,7 @@ const {
   renameLogoFile,
   removeCustomLogo,
   LOGO_FILENAME,
+  isDefaultFilename,
 } = require("../utils/files/logo");
 const { Telemetry } = require("../models/telemetry");
 const { WelcomeMessages } = require("../models/welcomeMessages");
@@ -574,9 +575,11 @@ function systemEndpoints(app) {
     }
   });
 
-  app.get("/system/logo", async function (_, response) {
+  app.get("/system/logo", async function (request, response) {
     try {
-      const defaultFilename = getDefaultFilename();
+      const darkMode =
+        !request?.query?.theme || request?.query?.theme === "default";
+      const defaultFilename = getDefaultFilename(darkMode);
       const logoPath = await determineLogoFilepath(defaultFilename);
       const { found, buffer, size, mime } = fetchLogo(logoPath);
 
@@ -596,7 +599,8 @@ function systemEndpoints(app) {
         "Content-Length": size,
         "X-Is-Custom-Logo":
           currentLogoFilename !== null &&
-          currentLogoFilename !== defaultFilename,
+          currentLogoFilename !== defaultFilename &&
+          !isDefaultFilename(currentLogoFilename),
       });
       response.end(Buffer.from(buffer, "base64"));
       return;
@@ -655,24 +659,18 @@ function systemEndpoints(app) {
     async function (request, response) {
       try {
         const { id } = request.params;
-        const pfpPath = await determinePfpFilepath(id);
+        if (response.locals?.user?.id !== Number(id))
+          return response.sendStatus(204).end();
 
-        if (!pfpPath) {
-          response.sendStatus(204).end();
-          return;
-        }
+        const pfpPath = await determinePfpFilepath(id);
+        if (!pfpPath) return response.sendStatus(204).end();
 
         const { found, buffer, size, mime } = fetchPfp(pfpPath);
-        if (!found) {
-          response.sendStatus(204).end();
-          return;
-        }
+        if (!found) return response.sendStatus(204).end();
 
         response.writeHead(200, {
           "Content-Type": mime || "image/png",
-          "Content-Disposition": `attachment; filename=${path.basename(
-            pfpPath
-          )}`,
+          "Content-Disposition": `attachment; filename=${path.basename(pfpPath)}`,
           "Content-Length": size,
         });
         response.end(Buffer.from(buffer, "base64"));
@@ -948,7 +946,7 @@ function systemEndpoints(app) {
 
   app.post(
     "/system/custom-models",
-    [validatedRequest],
+    [validatedRequest, flexUserRoleValid([ROLES.admin])],
     async (request, response) => {
       try {
         const { provider, apiKey = null, basePath = null } = reqBody(request);

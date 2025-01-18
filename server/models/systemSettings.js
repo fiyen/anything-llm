@@ -14,7 +14,7 @@ function isNullOrNaN(value) {
 }
 
 const SystemSettings = {
-  protectedFields: ["multi_user_mode"],
+  protectedFields: ["multi_user_mode", "hub_api_key"],
   publicFields: [
     "footer_data",
     "support_email",
@@ -49,6 +49,9 @@ const SystemSettings = {
 
     // beta feature flags
     "experimental_live_file_sync",
+
+    // Hub settings
+    "hub_api_key",
   ],
   validations: {
     footer_data: (updates) => {
@@ -165,6 +168,10 @@ const SystemSettings = {
         new MetaGenerator().clearConfig();
       }
     },
+    hub_api_key: (apiKey) => {
+      if (!apiKey) return null;
+      return String(apiKey);
+    },
   },
   currentSettings: async function () {
     const { hasVectorCachedFiles } = require("../utils/files");
@@ -191,8 +198,12 @@ const SystemSettings = {
       EmbeddingModelPref: process.env.EMBEDDING_MODEL_PREF,
       EmbeddingModelMaxChunkLength:
         process.env.EMBEDDING_MODEL_MAX_CHUNK_LENGTH,
+      VoyageAiApiKey: !!process.env.VOYAGEAI_API_KEY,
       GenericOpenAiEmbeddingApiKey:
         !!process.env.GENERIC_OPEN_AI_EMBEDDING_API_KEY,
+      GenericOpenAiEmbeddingMaxConcurrentChunks:
+        process.env.GENERIC_OPEN_AI_EMBEDDING_MAX_CONCURRENT_CHUNKS || 500,
+      GeminiEmbeddingApiKey: !!process.env.GEMINI_EMBEDDING_API_KEY,
 
       // --------------------------------------------------------
       // VectorDB Provider Selection Settings & Configs
@@ -524,9 +535,6 @@ const SystemSettings = {
       CohereApiKey: !!process.env.COHERE_API_KEY,
       CohereModelPref: process.env.COHERE_MODEL_PREF,
 
-      // VoyageAi API Keys
-      VoyageAiApiKey: !!process.env.VOYAGEAI_API_KEY,
-
       // DeepSeek API Keys
       DeepSeekApiKey: !!process.env.DEEPSEEK_API_KEY,
       DeepSeekModelPref: process.env.DEEPSEEK_MODEL_PREF,
@@ -538,6 +546,11 @@ const SystemSettings = {
       // xAI LLM API Keys
       XAIApiKey: !!process.env.XAI_LLM_API_KEY,
       XAIModelPref: process.env.XAI_LLM_MODEL_PREF,
+
+      // Nvidia NIM Keys
+      NvidiaNimLLMBasePath: process.env.NVIDIA_NIM_LLM_BASE_PATH,
+      NvidiaNimLLMModelPref: process.env.NVIDIA_NIM_LLM_MODEL_PREF,
+      NvidiaNimLLMTokenLimit: process.env.NVIDIA_NIM_LLM_MODEL_TOKEN_LIMIT,
     };
   },
 
@@ -560,6 +573,22 @@ const SystemSettings = {
         (await SystemSettings.get({ label: "experimental_live_file_sync" }))
           ?.value === "enabled",
     };
+  },
+
+  /**
+   * Get user configured Community Hub Settings
+   * Connection key is used to authenticate with the Community Hub API
+   * for your account.
+   * @returns {Promise<{connectionKey: string}>}
+   */
+  hubSettings: async function () {
+    try {
+      const hubKey = await this.get({ label: "hub_api_key" });
+      return { connectionKey: hubKey?.value || null };
+    } catch (error) {
+      console.error(error.message);
+      return { connectionKey: null };
+    }
   },
 };
 
